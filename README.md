@@ -87,6 +87,36 @@ to measure whether a model reproduces real vendor/CISA judgments.
 
 ---
 
+## Baseline results
+
+A QLoRA fine-tune of **Qwen2.5-Coder-7B-Instruct** (r=16, α=32, 1 epoch, 12k
+subsample of `train.jsonl`) gives a first baseline. Evaluated greedily (no
+sampling) on the held-out split (rows the trainer never saw, separated with the
+training shuffle seed) and on the CISA-gold set:
+
+**(A) `affected` vs `not_affected` — held-out test, n = 800**
+
+| Class | Precision | Recall | F1 |
+|---|---|---|---|
+| affected | 0.963 | 0.823 | 0.888 |
+| not_affected | 0.837 | 0.966 | 0.897 |
+| **macro-F1** | | | **0.892** |
+
+Accuracy 0.892; 5% of outputs were not parseable as a status and counted wrong.
+
+**(B) CISA-gold labels, n = 18 (real published ICS VEX justifications)**
+
+- `not_affected` **status** correct: **15 / 18**
+- justification **label** exact match: **0 / 18**
+
+The gap between (A) and (B) is the honest headline: the corpus teaches **Q1
+(is the vulnerable construct present?)** well — hence ~0.89 F1 on status — but
+the real CISA labels are dominated by `component_not_present` and
+`vulnerable_code_not_in_execute_path`, which need whole-program / SBOM context
+this function-level data does not carry. The model gets the *status* right on 15
+of 18 real cases yet never reproduces the exact CISA *label*. Treat status as the
+supported target and Q2/Q3/label as future work backed by program analysis.
+
 ## Scope and honest limits
 
 - The training labels are strongest for **Q1** (is the vulnerable construct
