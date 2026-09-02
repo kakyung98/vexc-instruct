@@ -57,18 +57,21 @@ The `justification` field is one of the five CISA labels
 
 | File | Rows | Purpose |
 |---|---|---|
-| `data/train.jsonl` | 10,068 | training set, balanced 5,034 affected / 5,034 not_affected |
+| `data/train.jsonl` | 23,538 | training set, balanced 11,769 affected / 11,769 not_affected |
 | `data/eval_cisa_gold.jsonl` | 18 | held-out gold: real CISA-published justifications (never train on this) |
 
 Fields: `instruction`, `completion`, `src` (provenance), and where available `cve`.
+De-duplicated across all sources by normalized function-code hash.
 
 ### Composition of `train.jsonl`
 
 | Source | Rows | What it contributes |
 |---|---|---|
-| DiverseVul | 7,000 | C/C++ functions labelled vulnerable/safe → present vs not-present |
-| BigVul | 3,000 | C/C++ vulnerable/patched function pairs → same construct, before vs after fix |
-| project seed | 68 | vuln/patched code pairs collected from upstream fix commits |
+| DiverseVul | 11,333 | C/C++ functions labelled vulnerable/safe → present vs not-present |
+| PrimeVul | 5,076 | curated, CVE-mapped C/C++ vulnerable/safe functions |
+| CVEfixes (C/C++) | 4,334 | real CVE fix pairs (vulnerable vs secure code) |
+| BigVul | 2,730 | C/C++ vulnerable/patched function pairs → before vs after fix |
+| project seed | 65 | vuln/patched code pairs collected from upstream fix commits |
 
 Labels map directly to VEX status:
 - a **vulnerable** function → `affected`
@@ -102,11 +105,12 @@ to measure whether a model reproduces real vendor/CISA judgments.
 The dataset is reproducible from public sources:
 
 ```bash
-python scripts/collect_bigvul.py       # BigVul  -> vulnfix rows
-python scripts/collect_diversevul.py   # DiverseVul -> vuln/safe rows
-python scripts/build_seed.py           # project fix-commit pairs
-python scripts/assemble.py             # merge, balance, split
+python scripts/build_dataset.py   # streams DiverseVul + PrimeVul + CVEfixes(C),
+                                  # merges BigVul + seed, dedups by code hash, balances
 ```
+
+`scripts/build_dataset.py` reproduces `data/train.jsonl` end to end (the older
+per-source collectors are kept in `scripts/` for reference).
 
 ---
 
@@ -116,6 +120,11 @@ Built from public vulnerability datasets, reused under their terms:
 
 - **DiverseVul** — Chen et al., *DiverseVul: A New Vulnerable Source Code Dataset*
   (RAID 2023). HF: `bstee615/diversevul`.
+- **PrimeVul** — Ding et al., *Vulnerability Detection with Code Language Models*
+  (2024). HF: `colin/PrimeVul`.
+- **CVEfixes** — Bhandari et al., *CVEfixes: Automated Collection of Vulnerabilities
+  and Their Fixes from Open-Source Software* (PROMISE 2021). HF: `rufimelo/cvefixes-cwe`
+  (C/C++ subset only).
 - **BigVul** — Fan et al., *A C/C++ Code Vulnerability Dataset with Code Changes
   and CVE Summaries* (MSR 2020). HF: `bstee615/bigvul`.
 - Project seed pairs are derived from upstream open-source fix commits (GitHub).
