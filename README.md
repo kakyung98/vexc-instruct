@@ -58,7 +58,7 @@ The `justification` field is one of the five CISA labels
 | File | Rows | Purpose |
 |---|---|---|
 | `data/train.jsonl` | 23,538 | training set, balanced 11,769 affected / 11,769 not_affected |
-| `data/eval_cisa_gold.jsonl` | 18 | held-out gold: real CISA-published justifications (never train on this) |
+| `data/eval_cisa_gold.jsonl` | 18 | reference list of the real CISA-published flags (12 advisories / 18 CVEs) — a label vocabulary, not a scored benchmark |
 
 Fields: `instruction`, `completion`, `src` (provenance), and where available `cve`.
 De-duplicated across all sources by normalized function-code hash.
@@ -77,13 +77,20 @@ Labels map directly to VEX status:
 - a **vulnerable** function → `affected`
 - a **patched / safe** function → `not_affected` + `vulnerable_code_not_present`
 
-### The gold eval set
+### The CISA reference set
 
 `eval_cisa_gold.jsonl` holds the **18 (advisory × CVE) pairs** that are the only
-public ICS VEX justifications — extracted from the 12 CISA ICS-CERT advisories
-whose CSAF documents carry a `vulnerabilities[].flags[].label`. Notably, all of
-them use *code/build* justifications; none use an environment-based one. Use it
-to measure whether a model reproduces real vendor/CISA judgments.
+public ICS VEX justifications — extracted from the **12** CISA ICS-CERT advisories
+whose CSAF documents carry a `vulnerabilities[].flags[].label`. All of them use
+*code/build* justifications; none use an environment-based one.
+
+These are a **reference vocabulary, not a benchmark.** Each flag is a **vendor
+assertion about a proprietary product build**, decided with whole-program
+knowledge that is not published, and the product source is not obtainable — so a
+model that judges a function in isolation cannot be scored against them (with no
+code to feed, it only emits a default). They tell you which labels real ICS VEX
+uses and how scarce it is (12 advisories, 18 CVEs, two vendors); they do not
+measure a code judge's accuracy.
 
 ---
 
@@ -94,7 +101,8 @@ subsample of `train.jsonl`) gives a first baseline. Evaluated greedily (no
 sampling) on the held-out split (rows the trainer never saw, separated with the
 training shuffle seed) and on the CISA-gold set:
 
-**(A) `affected` vs `not_affected` — held-out test, n = 800**
+**`affected` vs `not_affected` — held-out test, n = 800** (rows the trainer
+never saw, split with the training shuffle seed → no leakage):
 
 | Class | Precision | Recall | F1 |
 |---|---|---|---|
@@ -104,18 +112,18 @@ training shuffle seed) and on the CISA-gold set:
 
 Accuracy 0.892; 5% of outputs were not parseable as a status and counted wrong.
 
-**(B) CISA-gold labels, n = 18 (real published ICS VEX justifications)**
+This is the one honest number: real code in, and labels backed by the fix commit.
+It says the corpus teaches **Q1 (is the vulnerable construct present?)** well. It
+does not claim **Q2 (reachability)** or **Q3 (adversary control)** — those need
+whole-program context this function-level data lacks, and belong to program
+analysis (call graphs, taint, fuzzing) alongside a model.
 
-- `not_affected` **status** correct: **15 / 18**
-- justification **label** exact match: **0 / 18**
-
-The gap between (A) and (B) is the honest headline: the corpus teaches **Q1
-(is the vulnerable construct present?)** well — hence ~0.89 F1 on status — but
-the real CISA labels are dominated by `component_not_present` and
-`vulnerable_code_not_in_execute_path`, which need whole-program / SBOM context
-this function-level data does not carry. The model gets the *status* right on 15
-of 18 real cases yet never reproduces the exact CISA *label*. Treat status as the
-supported target and Q2/Q3/label as future work backed by program analysis.
+> **Not evaluated against the CISA flags.** The 18 published ICS VEX flags are
+> vendor assertions about proprietary product builds, and that product source is
+> not obtainable — so a code-level judge cannot be scored against them (with no
+> code to feed, the model only emits a default, measuring nothing). They are a
+> reference vocabulary of real labels, not a benchmark. See `eval_cisa_gold.jsonl`
+> below.
 
 ## Scope and honest limits
 
